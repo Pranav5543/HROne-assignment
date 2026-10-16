@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HRone • Employee Attendance & Analytics Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <!-- Header / Navigation -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-group">
+        <div class="brand-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">HRone Attendance</div>
+          <div class="brand-subtitle">Enterprise Attendance & Real-Time Analytics</div>
+        </div>
+        <div class="status-pill connected" id="db-status-pill">
+          <span class="status-dot"></span>
+          <span id="db-status-text">Atlas Connected</span>
+        </div>
+      </div>
+
+      <nav class="nav-tabs" id="nav-tabs">
+        <button class="nav-tab active" data-tab="punch">
+          <span class="tab-icon">⚡</span> Punch Station
+        </button>
+        <button class="nav-tab" data-tab="analytics">
+          <span class="tab-icon">📊</span> Analytics & KPIs
+        </button>
+        <button class="nav-tab" data-tab="employees">
+          <span class="tab-icon">👥</span> Employees
+        </button>
+        <button class="nav-tab" data-tab="attendance">
+          <span class="tab-icon">📋</span> Attendance Log
+        </button>
+        <button class="nav-tab" data-tab="leaderboard">
+          <span class="tab-icon">🏆</span> Leaderboard
+        </button>
+      </nav>
+
+      <div class="header-actions">
+        <button class="btn btn-secondary btn-sm" id="seed-demo-btn" title="Add 5 sample employees and recent attendance logs to test immediately">
+          <span>✨</span> Seed Demo Data
+        </button>
+        <button class="btn btn-primary btn-sm" id="open-add-emp-btn">
+          <span>+</span> Add Employee
+        </button>
+        <a href="/docs" target="_blank" class="btn btn-ghost btn-sm" title="View interactive Swagger OpenAPI documentation">
+          API Docs ↗
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Live Clock Bar -->
+  <div class="clock-banner">
+    <div class="clock-banner-container">
+      <div class="clock-left">
+        <span class="clock-label">CURRENT TIME (IST):</span>
+        <span class="clock-time" id="live-ist-clock">--:--:--</span>
+        <span class="clock-date" id="live-ist-date">----/--/--</span>
+      </div>
+      <div class="clock-right">
+        <span class="clock-metric">Shift Grace: <strong>10 mins</strong></span>
+        <span class="clock-divider">•</span>
+        <span class="clock-metric">Overtime Threshold: <strong>30 mins</strong></span>
+        <span class="clock-divider">•</span>
+        <span class="clock-metric">Half-Day Cutoff: <strong>4.5 hrs</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main View Container -->
+  <main class="main-container">
+
+    <!-- TAB 1: PUNCH STATION -->
+    <section class="tab-content active" id="tab-punch">
+      <div class="punch-layout">
+        <!-- Punch Card -->
+        <div class="card punch-card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Quick Punch Terminal</h2>
+              <p class="card-desc">Record attendance in real time. Rules (grace, late, overtime) are computed automatically.</p>
+            </div>
+            <div class="terminal-badge">R1-R5 Pure Math Verified</div>
+          </div>
+
+          <form id="punch-form" class="punch-form">
+            <div class="form-group">
+              <label for="punch-emp-select">Select Employee</label>
+              <div class="select-wrapper">
+                <select id="punch-emp-select" class="form-control" required>
+                  <option value="" disabled selected>-- Select an employee --</option>
+                </select>
+              </div>
+              <div class="form-hint" id="punch-emp-meta">Select an employee to view their shift window.</div>
+            </div>
+
+            <div class="form-group">
+              <label>Attendance Status (for Punch In)</label>
+              <div class="status-segmented-control">
+                <label class="status-option">
+                  <input type="radio" name="punch_status" value="PRESENT" checked>
+                  <span class="status-chip chip-present">
+                    <span class="chip-dot"></span> Present (Office)
+                  </span>
+                </label>
+                <label class="status-option">
+                  <input type="radio" name="punch_status" value="WFH">
+                  <span class="status-chip chip-wfh">
+                    <span class="chip-dot"></span> Work From Home
+                  </span>
+                </label>
+                <label class="status-option">
+                  <input type="radio" name="punch_status" value="ON_DUTY">
+                  <span class="status-chip chip-onduty">
+                    <span class="chip-dot"></span> On Duty (Client)
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Custom punch time toggle -->
+            <div class="form-group">
+              <div class="toggle-row">
+                <label for="custom-time-toggle" class="toggle-label">Override with custom timestamp (optional)</label>
+                <input type="checkbox" id="custom-time-toggle" class="toggle-checkbox">
+              </div>
+              <div id="custom-time-inputs" class="custom-time-inputs hidden">
+                <input type="datetime-local" id="custom-time-val" class="form-control">
+                <span class="form-hint">Allows testing historical records, early/late arrivals, or overnight shifts.</span>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="punch-actions">
+              <button type="button" class="btn btn-punch-in" id="do-punch-in-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                Punch IN
+              </button>
+              <button type="button" class="btn btn-punch-out" id="do-punch-out-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                Punch OUT
+              </button>
+            </div>
+          </form>
+
+          <!-- Punch Response Live Feedback -->
+          <div id="punch-result" class="punch-result hidden">
+            <div class="result-header">
+              <span class="result-icon">✓</span>
+              <strong id="result-title">Punch Recorded</strong>
+            </div>
+            <div class="result-grid" id="result-grid"></div>
+          </div>
+        </div>
+
+        <!-- Terminal Sidebar / Rule Explanations -->
+        <div class="punch-sidebar">
+          <div class="card rule-card">
+            <h3 class="card-title-sm">Business Logic Guide</h3>
+            <ul class="rule-list">
+              <li>
+                <div class="rule-num">R1</div>
+                <div><strong>Shift Dating:</strong> Punches are attributed to the shift start date in IST. Overnight shifts belonging to yesterday morning count correctly.</div>
+              </li>
+              <li>
+                <div class="rule-num">R2</div>
+                <div><strong>Grace Period:</strong> Late minutes are counted only if arrival is strictly &gt; 10 mins after shift start.</div>
+              </li>
+              <li>
+                <div class="rule-num">R3</div>
+                <div><strong>Overtime:</strong> Counted only if punch-out is &ge; 30 mins after shift end.</div>
+              </li>
+              <li>
+                <div class="rule-num">R4</div>
+                <div><strong>Work Hours:</strong> Rounded half-up to 2 decimals using exact Decimal math.</div>
+              </li>
+              <li>
+                <div class="rule-num">R5</div>
+                <div><strong>Half-Day:</strong> Flagged automatically when completed work hours &lt; 4.5 hours.</div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="card quick-stats-card">
+            <h3 class="card-title-sm">Live System State</h3>
+            <div class="stat-mini-row">
+              <span class="stat-mini-label">Total Employees:</span>
+              <span class="stat-mini-val" id="mini-emp-count">0</span>
+            </div>
+            <div class="stat-mini-row">
+              <span class="stat-mini-label">Today's Punches:</span>
+              <span class="stat-mini-val" id="mini-punch-count">0</span>
+            </div>
+            <div class="stat-mini-row">
+              <span class="stat-mini-label">Active Database:</span>
+              <span class="stat-mini-val" style="color: #10B981;">attendance_db</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: ANALYTICS & KPIS -->
+    <section class="tab-content" id="tab-analytics">
+      <div class="analytics-toolbar">
+        <div class="toolbar-left">
+          <label for="analytics-month" class="toolbar-label">Select Month:</label>
+          <input type="month" id="analytics-month" class="form-control form-control-sm">
+          <button class="btn btn-secondary btn-sm" id="refresh-analytics-btn">Refresh Analytics</button>
+        </div>
+        <div class="toolbar-right">
+          <span class="badge badge-purple">MongoDB Pipeline Aggregations ($lookup + $unionWith)</span>
+        </div>
+      </div>
+
+      <!-- KPI Summary Cards -->
+      <div class="kpi-grid">
+        <div class="card kpi-card">
+          <div class="kpi-icon-wrapper kpi-blue">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          </div>
+          <div>
+            <div class="kpi-val" id="kpi-total-headcount">0</div>
+            <div class="kpi-label">Active Headcount</div>
+          </div>
+        </div>
+
+        <div class="card kpi-card">
+          <div class="kpi-icon-wrapper kpi-green">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </div>
+          <div>
+            <div class="kpi-val" id="kpi-avg-rate">0.0%</div>
+            <div class="kpi-label">Avg Attendance Rate</div>
+          </div>
+        </div>
+
+        <div class="card kpi-card">
+          <div class="kpi-icon-wrapper kpi-amber">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          </div>
+          <div>
+            <div class="kpi-val" id="kpi-late-incidents">0</div>
+            <div class="kpi-label">Late Arrivals Recorded</div>
+          </div>
+        </div>
+
+        <div class="card kpi-card">
+          <div class="kpi-icon-wrapper kpi-purple">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </div>
+          <div>
+            <div class="kpi-val" id="kpi-total-workhours">0 hrs</div>
+            <div class="kpi-label">Total Productive Hours</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Department Summary Table -->
+      <div class="card mt-4">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Department Monthly Performance</h3>
+            <p class="card-desc">Computed using server-side aggregation pipelines across all logs and roster snapshots.</p>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table" id="dept-summary-table">
+            <thead>
+              <tr>
+                <th>Department</th>
+                <th>Headcount</th>
+                <th>Present Days</th>
+                <th>Avg Work Hours</th>
+                <th>Late Incidents</th>
+                <th>Attendance Rate</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="dept-summary-tbody">
+              <tr>
+                <td colspan="7" class="text-center py-4 text-muted">No department data available. Click "Seed Demo Data" above to view metrics!</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Department Trend Visualizer -->
+      <div class="card mt-4">
+        <div class="card-header flex-between">
+          <div>
+            <h3 class="card-title">Department Attendance Trend & Moving Average</h3>
+            <p class="card-desc">Daily attendance rate and 7-day moving average calculated using $setWindowFields and $densify.</p>
+          </div>
+          <div class="trend-controls">
+            <select id="trend-dept-select" class="form-control form-control-sm">
+              <option value="Engineering">Engineering</option>
+              <option value="Product">Product</option>
+              <option value="HR">HR</option>
+              <option value="Sales">Sales</option>
+            </select>
+            <input type="date" id="trend-from-date" class="form-control form-control-sm">
+            <input type="date" id="trend-to-date" class="form-control form-control-sm">
+            <button class="btn btn-secondary btn-sm" id="load-trend-btn">Plot Trend</button>
+          </div>
+        </div>
+        <div class="trend-chart-wrapper" id="trend-chart-container">
+          <div class="chart-empty-state" id="chart-empty">Select a date range (max 92 days) and click "Plot Trend" to view the graph.</div>
+          <svg id="trend-svg" class="trend-svg hidden" viewBox="0 0 800 320"></svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: EMPLOYEES DIRECTORY -->
+    <section class="tab-content" id="tab-employees">
+      <div class="card">
+        <div class="card-header flex-between">
+          <div>
+            <h2 class="card-title">Employee Directory</h2>
+            <p class="card-desc">Manage employee roster, shift hours, and departmental assignments.</p>
+          </div>
+          <div class="directory-filters">
+            <input type="text" id="emp-search-input" class="form-control form-control-sm" placeholder="🔍 Search code, name, email...">
+            <select id="emp-dept-filter" class="form-control form-control-sm">
+              <option value="">All Departments</option>
+            </select>
+            <button class="btn btn-primary btn-sm" id="emp-add-btn-2">+ Add Employee</button>
+          </div>
+        </div>
+
+        <div class="employee-grid" id="employee-cards-grid">
+          <div class="empty-state">
+            <div class="empty-icon">👥</div>
+            <h3>No Employees Registered Yet</h3>
+            <p>Get started by adding your first employee or loading demo test data.</p>
+            <button class="btn btn-primary" id="empty-add-emp-btn">+ Register First Employee</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: ATTENDANCE LOGBOOK -->
+    <section class="tab-content" id="tab-attendance">
+      <div class="card">
+        <div class="card-header flex-between">
+          <div>
+            <h2 class="card-title">Attendance Logbook</h2>
+            <p class="card-desc">Immutable daily punch records with audit history and regularization capability.</p>
+          </div>
+          <div class="log-filters">
+            <input type="text" id="log-filter-emp" class="form-control form-control-sm" placeholder="Emp Code (e.g. EMP1001)">
+            <select id="log-filter-status" class="form-control form-control-sm">
+              <option value="">All Statuses</option>
+              <option value="PRESENT">PRESENT</option>
+              <option value="WFH">WFH</option>
+              <option value="ON_DUTY">ON_DUTY</option>
+              <option value="ABSENT">ABSENT</option>
+              <option value="LEAVE">LEAVE</option>
+            </select>
+            <input type="date" id="log-filter-from" class="form-control form-control-sm" title="From Date">
+            <input type="date" id="log-filter-to" class="form-control form-control-sm" title="To Date">
+            <button class="btn btn-secondary btn-sm" id="log-filter-btn">Filter</button>
+            <button class="btn btn-ghost btn-sm" id="log-reset-btn">Reset</button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" id="attendance-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Emp Code</th>
+                <th>Status</th>
+                <th>Punch In</th>
+                <th>Punch Out</th>
+                <th>Work Hours</th>
+                <th>Late (Mins)</th>
+                <th>Overtime</th>
+                <th>Flags</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="attendance-tbody">
+              <tr>
+                <td colspan="10" class="text-center py-4 text-muted">No attendance logs found. Use the Punch Station to log punches!</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: LATE LEADERBOARD -->
+    <section class="tab-content" id="tab-leaderboard">
+      <div class="card">
+        <div class="card-header flex-between">
+          <div>
+            <h2 class="card-title">Late Arrival Leaderboard</h2>
+            <p class="card-desc">Ranked using MongoDB $rank window functions with tie handling.</p>
+          </div>
+          <div class="leaderboard-controls">
+            <input type="month" id="leaderboard-month" class="form-control form-control-sm">
+            <button class="btn btn-secondary btn-sm" id="refresh-leaderboard-btn">Load Ranks</button>
+          </div>
+        </div>
+
+        <div class="leaderboard-list" id="leaderboard-container">
+          <div class="empty-state">
+            <div class="empty-icon">🏆</div>
+            <h3>No Late Arrivals Recorded</h3>
+            <p>No employees arrived past their grace period for the selected month.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: ADD EMPLOYEE -->
+  <div class="modal-backdrop hidden" id="add-emp-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Register New Employee</h3>
+        <button class="modal-close" id="close-add-emp-modal">&times;</button>
+      </div>
+      <form id="add-emp-form">
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="new-emp-code">Employee Code *</label>
+              <input type="text" id="new-emp-code" class="form-control" placeholder="EMP1001" pattern="^EMP[0-9]{4,6}$" required>
+              <span class="form-hint">Pattern: EMP followed by 4-6 digits</span>
+            </div>
+            <div class="form-group">
+              <label for="new-emp-name">Full Name *</label>
+              <input type="text" id="new-emp-name" class="form-control" placeholder="Jane Doe" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="new-emp-email">Email Address *</label>
+              <input type="email" id="new-emp-email" class="form-control" placeholder="jane.doe@company.com" required>
+            </div>
+            <div class="form-group">
+              <label for="new-emp-dept">Department *</label>
+              <input type="text" id="new-emp-dept" class="form-control" placeholder="Engineering" required list="dept-suggestions">
+              <datalist id="dept-suggestions">
+                <option value="Engineering"></option>
+                <option value="Product"></option>
+                <option value="HR"></option>
+                <option value="Sales"></option>
+                <option value="Design"></option>
+              </datalist>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="new-emp-shift-start">Shift Start (HH:MM) *</label>
+              <input type="text" id="new-emp-shift-start" class="form-control" value="09:30" pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$" required>
+            </div>
+            <div class="form-group">
+              <label for="new-emp-shift-end">Shift End (HH:MM) *</label>
+              <input type="text" id="new-emp-shift-end" class="form-control" value="18:30" pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="new-emp-joined">Date Joined *</label>
+            <input type="date" id="new-emp-joined" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" id="cancel-add-emp-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="save-new-emp-btn">Create Employee</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: REGULARIZE ATTENDANCE -->
+  <div class="modal-backdrop hidden" id="regularize-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Regularize Attendance Record</h3>
+        <button class="modal-close" id="close-regularize-modal">&times;</button>
+      </div>
+      <form id="regularize-form">
+        <div class="modal-body">
+          <div class="info-banner" id="reg-info-banner">
+            Regularizing record for <strong id="reg-emp-code">--</strong> on date <strong id="reg-date">--</strong>
+          </div>
+
+          <div class="form-group">
+            <label for="reg-status">New Status</label>
+            <select id="reg-status" class="form-control">
+              <option value="">(Keep current status)</option>
+              <option value="PRESENT">PRESENT</option>
+              <option value="WFH">WFH</option>
+              <option value="ON_DUTY">ON_DUTY</option>
+              <option value="ABSENT">ABSENT</option>
+              <option value="LEAVE">LEAVE</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reg-punch-in">Override Punch In</label>
+              <input type="datetime-local" id="reg-punch-in" class="form-control">
+            </div>
+            <div class="form-group">
+              <label for="reg-punch-out">Override Punch Out</label>
+              <input type="datetime-local" id="reg-punch-out" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="reg-reason">Reason for Correction *</label>
+            <textarea id="reg-reason" class="form-control" rows="2" placeholder="e.g. Card scanner hardware malfunction at main entrance" required minlength="5" maxlength="200"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="reg-by">Regularized By (Manager Name/ID) *</label>
+            <input type="text" id="reg-by" class="form-control" placeholder="HR Admin / Manager" required>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" id="cancel-regularize-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="save-regularize-btn">Apply Regularization</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
